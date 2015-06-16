@@ -96,8 +96,7 @@ relative import to an absolute import.
         return sys.modules[name]
 
 
-def load_class(uri, default="gunicorn.workers.sync.SyncWorker",
-        section="gunicorn.workers"):
+def load_class(uri, default="gunicorn.workers.sync.SyncWorker", section="gunicorn.workers"):
     if inspect.isclass(uri):
         return uri
     if uri.startswith("egg:"):
@@ -345,12 +344,17 @@ def normalize_name(name):
 
 
 def import_app(module):
+    # 如何加载app module呢?
+    # 例如: test:app
     parts = module.split(":", 1)
+
+    # application的默认名字
     if len(parts) == 1:
         module, obj = module, "application"
     else:
         module, obj = parts[0], parts[1]
 
+    # 先加载module
     try:
         __import__(module)
     except ImportError:
@@ -362,6 +366,7 @@ def import_app(module):
 
     mod = sys.modules[module]
 
+    # 取出其中的application对象
     try:
         app = eval(obj, mod.__dict__)
     except NameError:
@@ -370,6 +375,7 @@ def import_app(module):
     if app is None:
         raise AppImportError("Failed to find application object: %r" % obj)
 
+    # 验证app可以call
     if not callable(app):
         raise AppImportError("Application object must be callable.")
     return app
@@ -405,9 +411,12 @@ def daemonize(enable_stdio_inheritance=False):
     """\
     Standard daemonization of a process.
     http://www.svbug.com/documentation/comp.unix.programmer-FAQ/faq_2.html#SEC16
+
+    标准的将一个进程变成daemon的方法
     """
     if 'GUNICORN_FD' not in os.environ:
         if os.fork():
+            # 主进程退出
             os._exit(0)
         os.setsid()
 

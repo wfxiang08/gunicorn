@@ -146,8 +146,8 @@ def create_sockets(conf, log):
     # gunicorn.
     # http://www.freedesktop.org/software/systemd/man/systemd.socket.html
     listeners = []
-    if ('LISTEN_PID' in os.environ
-            and int(os.environ.get('LISTEN_PID')) == os.getpid()):
+    if ('LISTEN_PID' in os.environ and int(os.environ.get('LISTEN_PID')) == os.getpid()):
+
         for i in range(int(os.environ.get('LISTEN_FDS', 0))):
             fd = i + SD_LISTEN_FDS_START
             try:
@@ -156,18 +156,17 @@ def create_sockets(conf, log):
                 if isinstance(sockname, str) and sockname.startswith('/'):
                     listeners.append(UnixSocket(sockname, conf, log, fd=fd))
                 elif len(sockname) == 2 and '.' in sockname[0]:
-                    listeners.append(TCPSocket("%s:%s" % sockname, conf, log,
-                        fd=fd))
+                    # tcp socket
+                    listeners.append(TCPSocket("%s:%s" % sockname, conf, log, fd=fd))
                 elif len(sockname) == 4 and ':' in sockname[0]:
-                    listeners.append(TCP6Socket("[%s]:%s" % sockname[:2], conf,
-                        log, fd=fd))
+                    # ipv6 ?
+                    listeners.append(TCP6Socket("[%s]:%s" % sockname[:2], conf, log, fd=fd))
             except socket.error:
                 pass
         del os.environ['LISTEN_PID'], os.environ['LISTEN_FDS']
 
         if listeners:
-            log.debug('Socket activation sockets: %s',
-                    ",".join([str(l) for l in listeners]))
+            log.debug('Socket activation sockets: %s', ",".join([str(l) for l in listeners]))
             return listeners
 
     # get it only once

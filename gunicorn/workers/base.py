@@ -38,9 +38,13 @@ class Worker(object):
         changes you'll want to do that in ``self.init_process()``.
         """
         self.age = age
-        self.ppid = ppid
+        self.ppid = ppid # 记住ppid作用?
+
         self.sockets = sockets
+
+        # 要指定的任务, 例如: uwsgi#application
         self.app = app
+
         self.timeout = timeout
         self.cfg = cfg
         self.booted = False

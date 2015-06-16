@@ -41,6 +41,7 @@ def make_settings(ignore=None):
         setting = s()
         if setting.name in ignore:
             continue
+        # 包含各种 setting
         settings[setting.name] = setting.copy()
     return settings
 
@@ -59,6 +60,7 @@ class Config(object):
         return self.settings[name].get()
 
     def __setattr__(self, name, value):
+        # 只能设置 settings?
         if name != "settings" and name in self.settings:
             raise AttributeError("Invalid access!")
         super(Config, self).__setattr__(name, value)
@@ -101,10 +103,15 @@ class Config(object):
         uri = self.settings['worker_class'].get()
 
         ## are we using a threaded worker?
+        # 默认为: sync ? 在什么地方配置呢?
         is_sync = uri.endswith('SyncWorker') or uri == 'sync'
+
+        # sync
+        # gthread 两种模式
         if is_sync and self.threads > 1:
             uri = "gunicorn.workers.gthread.ThreadWorker"
 
+        # 加载worker_class
         worker_class = util.load_class(uri)
         if hasattr(worker_class, "setup"):
             worker_class.setup()
@@ -193,17 +200,34 @@ class Config(object):
 
 class SettingMeta(type):
     def __new__(cls, name, bases, attrs):
+        # 做啥了
+        # 'Setting', (Setting,), {}
+        # name       bases       attrs
+
+
         super_new = super(SettingMeta, cls).__new__
+
+        # 如果不是一个 SettingMeta 的子类，那么直接使用默认的方法构造
         parents = [b for b in bases if isinstance(b, SettingMeta)]
         if not parents:
+            # 分支1:
             return super_new(cls, name, bases, attrs)
 
         attrs["order"] = len(KNOWN_SETTINGS)
         attrs["validator"] = wrap_method(attrs["validator"])
 
+        # 创建一个新的class
         new_class = super_new(cls, name, bases, attrs)
         new_class.fmt_desc(attrs.get("desc", ""))
+
+        #
+        # 大概的意思就是在类定义的时候就主动去某个地方注册
+        # 在自己项目中是否需要呢?
+        #
+        # print "Name: ", name, bases, attrs
         KNOWN_SETTINGS.append(new_class)
+        # 分支2:
+        # 不管是分支1，还是分支2创建的class都是由 SettingMeta 生成的
         return new_class
 
     def fmt_desc(cls, desc):
@@ -278,7 +302,7 @@ class Setting(object):
     __cmp__ = __lt__
 
 Setting = SettingMeta('Setting', (Setting,), {})
-
+# Settings由SettingsMeta创建，那么它所有的子类都会是这样的
 
 def validate_bool(val):
     if isinstance(val, bool):
@@ -546,10 +570,14 @@ class Workers(Setting):
 class WorkerClass(Setting):
     name = "worker_class"
     section = "Worker Processes"
+    # 如何设置WorkerClass
     cli = ["-k", "--worker-class"]
     meta = "STRING"
     validator = validate_class
+
+    # 默认为sync
     default = "sync"
+
     desc = """\
         The type of workers to use.
 

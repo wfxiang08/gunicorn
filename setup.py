@@ -89,6 +89,12 @@ setup(
     tests_require=tests_require,
     cmdclass={'test': PyTestCommand},
 
+    #
+    # 如何理解呢?
+    # load_entry_point('gunicorn==19.3.0', 'console_scripts', 'gunicorn')()
+    #
+    # gunicorn-19.3.0-py2.7.egg/EGG-INFO/entry_points.txt
+    #
     entry_points="""
     [console_scripts]
     gunicorn=gunicorn.app.wsgiapp:run

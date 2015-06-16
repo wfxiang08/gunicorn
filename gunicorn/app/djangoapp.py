@@ -2,7 +2,8 @@
 #
 # This file is part of gunicorn released under the MIT license.
 # See the NOTICE for more information.
-
+# 这个代码被废弃, See wsgiapp instead
+#
 import os
 import sys
 
@@ -156,5 +157,7 @@ def run():
 
     See https://docs.djangoproject.com/en/1.5/howto/deployment/wsgi/gunicorn/
     for more info.""")
+
+    # 这个代码被废弃
     from gunicorn.app.djangoapp import DjangoApplication
     DjangoApplication("%(prog)s [OPTIONS] [SETTINGS_PATH]").run()

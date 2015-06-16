@@ -13,6 +13,8 @@ from gunicorn import util
 
 class WSGIApplication(Application):
     def init(self, parser, opts, args):
+
+        # pasteapp的处理
         if opts.paste and opts.paste is not None:
             app_name = 'main'
             path = opts.paste
@@ -35,9 +37,14 @@ class WSGIApplication(Application):
             parser.error("No application module specified.")
 
         self.cfg.set("default_proc_name", args[0])
-        self.app_uri = args[0]
+        self.app_uri = args[0] # 例如: test:app
+
 
     def chdir(self):
+        """
+            切换到指定的dir, 并且修改 sys.path
+            :return:
+        """
         # chdir to the configured path before loading,
         # default is the current dir
         os.chdir(self.cfg.chdir)
@@ -46,6 +53,10 @@ class WSGIApplication(Application):
         sys.path.insert(0, self.cfg.chdir)
 
     def load_wsgiapp(self):
+        """
+            加载 wsgiapp
+            :return:
+        """
         self.chdir()
 
         # load the app
@@ -59,6 +70,10 @@ class WSGIApplication(Application):
         return load_pasteapp(self.cfgurl, self.relpath, global_conf=None)
 
     def load(self):
+        """
+            加载app， 返回app对象
+            :return:
+        """
         if self.cfg.paste is not None:
             return self.load_pasteapp()
         else:
@@ -71,6 +86,10 @@ def run():
     generic WSGI applications.
     """
     from gunicorn.app.wsgiapp import WSGIApplication
+    #
+    # 如何解析参数呢?
+    # gunicorn --workers=2 test:app
+    #
     WSGIApplication("%(prog)s [OPTIONS] [APP_MODULE]").run()
 
 

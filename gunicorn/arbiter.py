@@ -44,12 +44,10 @@ class Arbiter(object):
 
     # I love dynamic languages
     SIG_QUEUE = []
-    SIGNALS = [getattr(signal, "SIG%s" % x)
-            for x in "HUP QUIT INT TERM TTIN TTOU USR1 USR2 WINCH".split()]
-    SIG_NAMES = dict(
-        (getattr(signal, name), name[3:].lower()) for name in dir(signal)
-        if name[:3] == "SIG" and name[3] != "_"
-    )
+    SIGNALS = [getattr(signal, "SIG%s" % x) for x in "HUP QUIT INT TERM TTIN TTOU USR1 USR2 WINCH".split()]
+
+    # 保留一般的信号
+    SIG_NAMES = dict((getattr(signal, name), name[3:].lower()) for name in dir(signal) if name[:3] == "SIG" and name[3] != "_")
 
     def __init__(self, app):
         os.environ["SERVER_SOFTWARE"] = SERVER_SOFTWARE
@@ -60,10 +58,14 @@ class Arbiter(object):
         self.pidfile = None
         self.worker_age = 0
         self.reexec_pid = 0
+
+        # Master
         self.master_name = "Master"
 
         cwd = util.getcwd()
 
+        # gunicorn --workers=2 test:app
+        # python test:app ?
         args = sys.argv[:]
         args.insert(0, sys.executable)
 
@@ -92,6 +94,7 @@ class Arbiter(object):
         if 'GUNICORN_FD' in os.environ:
             self.log.reopen_files()
 
+        # SyncWorker
         self.worker_class = self.cfg.worker_class
         self.address = self.cfg.address
         self.num_workers = self.cfg.workers
@@ -110,6 +113,7 @@ class Arbiter(object):
             for k, v in self.cfg.env.items():
                 os.environ[k] = v
 
+        # 加载wsgi app
         if self.cfg.preload_app:
             self.app.wsgi()
 
@@ -168,31 +172,47 @@ class Arbiter(object):
 
     def run(self):
         "Main master loop."
+
+        # 如何启动uwsgi进程呢?
+        #
         self.start()
         util._setproctitle("master [%s]" % self.proc_name)
 
         self.manage_workers()
+
+        # 正常情况下如何工作呢?
         while True:
             try:
+                # 读取新的信号
                 sig = self.SIG_QUEUE.pop(0) if len(self.SIG_QUEUE) else None
+
+                # 如果没有信号，则sleep
                 if sig is None:
+                    # 如果没有任务就sleep
                     self.sleep()
                     self.murder_workers()
                     self.manage_workers()
                     continue
 
+                # 如果读取到非法的，则跳过
                 if sig not in self.SIG_NAMES:
                     self.log.info("Ignoring unknown signal: %s", sig)
                     continue
 
+                # 如果读取到信号，则条用callback
                 signame = self.SIG_NAMES.get(sig)
                 handler = getattr(self, "handle_%s" % signame, None)
                 if not handler:
                     self.log.error("Unhandled signal: %s", signame)
                     continue
                 self.log.info("Handling signal: %s", signame)
+
+                # 如果存在handler, 则调用handler(处理信号)
                 handler()
+
+                # 唤醒?
                 self.wakeup()
+
             except StopIteration:
                 self.halt()
             except KeyboardInterrupt:
@@ -312,6 +332,7 @@ class Arbiter(object):
             ready = select.select([self.PIPE[0]], [], [], 1.0)
             if not ready[0]:
                 return
+            # 如果PIPE[0]一直为1, 则一直等待
             while os.read(self.PIPE[0], 1):
                 pass
         except select.error as e:
@@ -390,10 +411,16 @@ class Arbiter(object):
 
         # do we need to change listener ?
         if old_address != self.cfg.address:
+            #
+            # 关闭已有的 listeners
             # close all listeners
+            #
             [l.close() for l in self.LISTENERS]
+
+            # 创建新的sockets, 这些listener如何工作呢?
             # init new listeners
             self.LISTENERS = create_sockets(self.cfg, self.log)
+
             self.log.info("Listening at: %s", ",".join(str(self.LISTENERS)))
 
         # do some actions on reload
@@ -473,13 +500,17 @@ class Arbiter(object):
         Maintain the number of workers by spawning or killing
         as required.
         """
+        # 不够则增加爱
         if len(self.WORKERS.keys()) < self.num_workers:
             self.spawn_workers()
 
+        # 按照age升序排列
         workers = self.WORKERS.items()
         workers = sorted(workers, key=lambda w: w[1].age)
+
+        # 删除多余的进程
         while len(workers) > self.num_workers:
-            (pid, _) = workers.pop(0)
+            (pid, _) = workers.pop(0) # 删除最新创建的?
             self.kill_worker(pid, signal.SIGTERM)
 
         self.log.debug("{0} workers".format(len(workers)),
@@ -489,22 +520,33 @@ class Arbiter(object):
 
     def spawn_worker(self):
         self.worker_age += 1
-        worker = self.worker_class(self.worker_age, self.pid, self.LISTENERS,
-                                   self.app, self.timeout / 2.0,
-                                   self.cfg, self.log)
+
+        # worker_class
+        # 参考: gunicorn.workers.xxxx
+        #
+        worker = self.worker_class(self.worker_age, self.pid, self.LISTENERS, self.app, self.timeout / 2.0, self.cfg, self.log)
         self.cfg.pre_fork(self, worker)
+
         pid = os.fork()
         if pid != 0:
+            # 主进程记住子进程的状态
             self.WORKERS[pid] = worker
             return pid
 
+        # 子进程要做什么呢?
         # Process Child
         worker_pid = os.getpid()
         try:
+            # 设置自己的状态
             util._setproctitle("worker [%s]" % self.proc_name)
             self.log.info("Booting worker with pid: %s", worker_pid)
+
             self.cfg.post_fork(self, worker)
+
+            # 进程开始工作?
             worker.init_process()
+
+
             sys.exit(0)
         except SystemExit:
             raise

@@ -41,6 +41,8 @@ class BaseApplication(object):
 
     def load_default_config(self):
         # init configuration
+        # 根据usage来解析参数
+        #
         self.cfg = Config(self.usage, prog=self.prog)
 
     def init(self, parser, opts, args):
@@ -63,12 +65,17 @@ class BaseApplication(object):
             debug.spew()
 
     def wsgi(self):
+        """
+            读物 wsgi callable
+            :return:
+        """
         if self.callable is None:
             self.callable = self.load()
         return self.callable
 
     def run(self):
         try:
+            # 调度者调度(和file uploader的代码一致)
             Arbiter(self).run()
         except RuntimeError as e:
             print("\nError: %s\n" % e, file=sys.stderr)
@@ -133,6 +140,7 @@ class Application(BaseApplication):
 
     def load_config(self):
         # parse console args
+        # 解析参数
         parser = self.cfg.parser()
         args = parser.parse_args()
 
@@ -161,6 +169,7 @@ class Application(BaseApplication):
             self.cfg.set(k.lower(), v)
 
     def run(self):
+        # App如何运行呢?
         if self.cfg.check_config:
             try:
                 self.load()
@@ -175,11 +184,15 @@ class Application(BaseApplication):
         if self.cfg.spew:
             debug.spew()
 
+        # 是否为daemon
         if self.cfg.daemon:
             util.daemonize(self.cfg.enable_stdio_inheritance)
 
         # set python paths
         if self.cfg.pythonpath and self.cfg.pythonpath is not None:
+            #
+            # 自定义的python path(直接将python的搜索路径放在sys.path的最前面
+            #
             paths = self.cfg.pythonpath.split(",")
             for path in paths:
                 pythonpath = os.path.abspath(path)

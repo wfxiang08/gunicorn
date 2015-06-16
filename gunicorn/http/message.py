@@ -199,10 +199,12 @@ class Request(Message):
             self.unreader.unread(data[2:])
             return b""
 
+        # 读取headers
         self.headers = self.parse_headers(data[:idx])
 
+        # 返回body
         ret = data[idx + 4:]
-        buf = BytesIO()
+        # buf = BytesIO()
         return ret
 
     def read_line(self, unreader, buf, limit=0):

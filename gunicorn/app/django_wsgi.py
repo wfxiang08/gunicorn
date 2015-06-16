@@ -25,6 +25,7 @@ try:
     from django.core.servers.basehttp import get_internal_wsgi_application
     django14 = True
 except ImportError:
+    # django1.4以下
     from django.core.handlers.wsgi import WSGIHandler
     django14 = False
 

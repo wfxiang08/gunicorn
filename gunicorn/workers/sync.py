@@ -27,11 +27,15 @@ class SyncWorker(base.Worker):
         client, addr = listener.accept()
         client.setblocking(1)
         util.close_on_exec(client)
+
+        # 为什么client要设置为blocking的呢?
         self.handle(listener, client, addr)
 
     def wait(self, timeout):
         try:
             self.notify()
+
+            # 选中一个socket?
             ret = select.select(self.sockets, [], self.PIPE, timeout)
             if ret[0]:
                 return ret[0]
@@ -54,8 +58,11 @@ class SyncWorker(base.Worker):
         return True
 
     def run_for_one(self, timeout):
+
+        # 简化问题, 只有一个 listener
         listener = self.sockets[0]
         while self.alive:
+            # 通知主进程?  否则当前的worker有可能被干死?
             self.notify()
 
             # Accept a connection. If we get an error telling us
@@ -108,6 +115,11 @@ class SyncWorker(base.Worker):
         # use the CPU for nothing. This minimal timeout prevent it.
         timeout = self.timeout or 0.5
 
+        #
+        # 如何运行呢?
+        # 多个workers如何分摊给gunicorn的请求呢?
+        #
+
         # self.socket appears to lose its blocking status after
         # we fork in the arbiter. Reset it here.
         for s in self.sockets:
@@ -116,18 +128,23 @@ class SyncWorker(base.Worker):
         if len(self.sockets) > 1:
             self.run_for_multiple(timeout)
         else:
+            # 假定只监听一个端口
             self.run_for_one(timeout)
 
     def handle(self, listener, client, addr):
         req = None
         try:
-            if self.cfg.is_ssl:
-                client = ssl.wrap_socket(client, server_side=True,
-                    **self.cfg.ssl_options)
+            # 先不考虑 ssl
+            # if self.cfg.is_ssl:
+            #     client = ssl.wrap_socket(client, server_side=True, **self.cfg.ssl_options)
 
+            # 如何解析client的请求呢?
             parser = http.RequestParser(self.cfg, client)
             req = six.next(parser)
+
+
             self.handle_request(listener, req, client, addr)
+
         except http.errors.NoMoreData as e:
             self.log.debug("Ignored premature client disconnection. %s", e)
         except StopIteration as e:
@@ -158,8 +175,8 @@ class SyncWorker(base.Worker):
         try:
             self.cfg.pre_request(self, req)
             request_start = datetime.now()
-            resp, environ = wsgi.create(req, client, addr,
-                    listener.getsockname(), self.cfg)
+            resp, environ = wsgi.create(req, client, addr, listener.getsockname(), self.cfg)
+
             # Force the connection closed until someone shows
             # a buffering proxy that supports Keep-Alive to
             # the backend.
@@ -168,7 +185,14 @@ class SyncWorker(base.Worker):
             if self.nr >= self.max_requests:
                 self.log.info("Autorestarting worker after current request.")
                 self.alive = False
+
+            # wsgi接口
+            # gunicorn将数据解析好，准备了environ和 start_response函数
+            # environ 还不是一个正式的Request, 而是带有RAW数据的Http请求
+            # gunicorn是工作在http协议层的，中间有不少环境是用来解析http数据的
+            #
             respiter = self.wsgi(environ, resp.start_response)
+
             try:
                 if isinstance(respiter, environ['wsgi.file_wrapper']):
                     resp.write_file(respiter)

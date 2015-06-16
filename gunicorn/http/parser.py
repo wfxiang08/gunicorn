@@ -31,6 +31,8 @@ class Parser(object):
             raise StopIteration()
 
         # Discard any unread body of the previous message
+        #
+        # 为什么要读取完毕之前没有读取的数据呢? 链路上的缓冲?
         if self.mesg:
             data = self.mesg.body.read(8192)
             while data:
@@ -39,6 +41,7 @@ class Parser(object):
         # Parse the next request
         self.req_count += 1
         self.mesg = self.mesg_class(self.cfg, self.unreader, self.req_count)
+
         if not self.mesg:
             raise StopIteration()
         return self.mesg
