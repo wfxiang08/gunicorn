@@ -113,7 +113,7 @@ class Arbiter(object):
             for k, v in self.cfg.env.items():
                 os.environ[k] = v
 
-        # 加载wsgi app
+        # 加载wsgi app(加载之后是否存在问题: 例如重新创建一个worker, 但是代码可能不会更新?)
         if self.cfg.preload_app:
             self.app.wsgi()
 
@@ -123,10 +123,12 @@ class Arbiter(object):
         """
         self.log.info("Starting gunicorn %s", __version__)
 
+        # 保存pid
         self.pid = os.getpid()
         if self.cfg.pidfile is not None:
             self.pidfile = Pidfile(self.cfg.pidfile)
             self.pidfile.create(self.pid)
+
         self.cfg.on_starting(self)
 
         self.init_signals()
@@ -355,7 +357,10 @@ class Arbiter(object):
         sig = signal.SIGTERM
         if not graceful:
             sig = signal.SIGQUIT
+
         limit = time.time() + self.cfg.graceful_timeout
+
+        # 首先graceful关闭所有的worker, 如果失败，则强制执行
         # instruct the workers to exit
         self.kill_workers(sig)
         # wait until the graceful timeout
@@ -366,6 +371,7 @@ class Arbiter(object):
 
     def reexec(self):
         """\
+        重启?
         Relaunch the master and workers.
         """
         if self.pidfile is not None:
@@ -376,6 +382,9 @@ class Arbiter(object):
             self.master_name = "Old Master"
             return
 
+        # 在新的进程中, 旧的进程如何处理呢?
+
+        # 使用之前的环境变量重新创建一个环境
         environ = self.cfg.env_orig.copy()
         fds = [l.fileno() for l in self.LISTENERS]
         environ['GUNICORN_FD'] = ",".join([str(fd) for fd in fds])
@@ -387,6 +396,10 @@ class Arbiter(object):
         os.execvpe(self.START_CTX[0], self.START_CTX['args'], environ)
 
     def reload(self):
+        """
+        重新加载app, 并且spawn_worker, 最后再通过 manage_workers 杀掉多余的workers
+        :return:
+        """
         old_address = self.cfg.address
 
         # reset old environement
@@ -402,6 +415,7 @@ class Arbiter(object):
                 except KeyError:
                     pass
 
+        # 1. 重新加载配置
         # reload conf
         self.app.reload()
         self.setup(self.app)
@@ -409,7 +423,7 @@ class Arbiter(object):
         # reopen log files
         self.log.reopen_files()
 
-        # do we need to change listener ?
+        # 2. 如果监听的地址改变，则需要重新创建sockets(一般情况下, 如: 代码升级，不会改变sockets)
         if old_address != self.cfg.address:
             #
             # 关闭已有的 listeners
@@ -438,11 +452,11 @@ class Arbiter(object):
         # set new proc_name
         util._setproctitle("master [%s]" % self.proc_name)
 
-        # spawn new workers
+        # 3. spawn new workers(这个地方是风险)
         for i in range(self.cfg.workers):
             self.spawn_worker()
 
-        # manage workers
+        # 4. manage workers
         self.manage_workers()
 
     def murder_workers(self):
@@ -451,19 +465,25 @@ class Arbiter(object):
         """
         if not self.timeout:
             return
+
+        # 如果有 timeout控制, 则检查时间timeout
         workers = list(self.WORKERS.items())
         for (pid, worker) in workers:
             try:
+                # 如果没有超时
                 if time.time() - worker.tmp.last_update() <= self.timeout:
                     continue
             except ValueError:
                 continue
 
+            # 这里的两种方式的区别?
+            # signal.SIGTERM 是一种种比较温顺的方法(不过已经timeout, 说明这种方法失效了)
             if not worker.aborted:
                 self.log.critical("WORKER TIMEOUT (pid:%s)", pid)
                 worker.aborted = True
                 self.kill_worker(pid, signal.SIGABRT)
             else:
+                # 强制杀死(表示通过 SIGABRT 没有杀死)
                 self.kill_worker(pid, signal.SIGKILL)
 
     def reap_workers(self):
@@ -475,6 +495,7 @@ class Arbiter(object):
                 wpid, status = os.waitpid(-1, os.WNOHANG)
                 if not wpid:
                     break
+
                 if self.reexec_pid == wpid:
                     self.reexec_pid = 0
                 else:
@@ -506,17 +527,16 @@ class Arbiter(object):
 
         # 按照age升序排列
         workers = self.WORKERS.items()
-        workers = sorted(workers, key=lambda w: w[1].age)
+        workers = sorted(workers, key=lambda w: w[1].age) # age是如何计算的？ age应该是出生的日期吧? 越新的worker的age越大
 
         # 删除多余的进程
         while len(workers) > self.num_workers:
-            (pid, _) = workers.pop(0) # 删除最新创建的?
+            (pid, _) = workers.pop(0)
+
+            # 让多余的Process干完活了，就自己解决自己
             self.kill_worker(pid, signal.SIGTERM)
 
-        self.log.debug("{0} workers".format(len(workers)),
-                       extra={"metric": "gunicorn.workers",
-                              "value": len(workers),
-                              "mtype": "gauge"})
+        self.log.debug("{0} workers".format(len(workers)), extra={"metric": "gunicorn.workers", "value": len(workers), "mtype": "gauge"})
 
     def spawn_worker(self):
         self.worker_age += 1

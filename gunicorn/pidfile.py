@@ -22,8 +22,10 @@ class Pidfile(object):
     def create(self, pid):
         oldpid = self.validate()
         if oldpid:
+            # 如果已经保存，则OK
             if oldpid == os.getpid():
                 return
+            # 否则报警
             msg = "Already running on PID %s (or pid file '%s' is stale)"
             raise RuntimeError(msg % (oldpid, self.fname))
 
@@ -75,10 +77,12 @@ class Pidfile(object):
                     os.kill(wpid, 0)
                     return wpid
                 except OSError as e:
+                    # 寻找失败
                     if e.args[0] == errno.ESRCH:
                         return
                     raise
         except IOError as e:
+            # 没有对应的pid, 则直接返回
             if e.args[0] == errno.ENOENT:
                 return
             raise

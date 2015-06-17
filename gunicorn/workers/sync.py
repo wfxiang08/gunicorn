@@ -36,6 +36,7 @@ class SyncWorker(base.Worker):
             self.notify()
 
             # 选中一个socket?
+            # self.PIPE 做什么用的?
             ret = select.select(self.sockets, [], self.PIPE, timeout)
             if ret[0]:
                 return ret[0]
@@ -62,7 +63,7 @@ class SyncWorker(base.Worker):
         # 简化问题, 只有一个 listener
         listener = self.sockets[0]
         while self.alive:
-            # 通知主进程?  否则当前的worker有可能被干死?
+            # 通知主进程, 我现在开始做下一件事情
             self.notify()
 
             # Accept a connection. If we get an error telling us
@@ -98,6 +99,7 @@ class SyncWorker(base.Worker):
             except StopWaiting:
                 return
 
+            # 依次处理所有的ready的sockets
             if ready is not None:
                 for listener in ready:
                     try:

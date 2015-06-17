@@ -38,6 +38,10 @@ class WorkerTmp(object):
         self.spinner = 0
 
     def notify(self):
+        """
+            通过文件实现进程间的通信
+        :return:
+        """
         try:
             self.spinner = (self.spinner + 1) % 2
             os.fchmod(self._tmp.fileno(), self.spinner)

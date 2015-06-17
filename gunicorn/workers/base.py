@@ -147,12 +147,14 @@ class Worker(object):
     def init_signals(self):
         # reset signaling
         [signal.signal(s, signal.SIG_DFL) for s in self.SIGNALS]
+
         # init new signaling
         signal.signal(signal.SIGQUIT, self.handle_quit)
         signal.signal(signal.SIGTERM, self.handle_exit)
         signal.signal(signal.SIGINT, self.handle_quit)
         signal.signal(signal.SIGWINCH, self.handle_winch)
         signal.signal(signal.SIGUSR1, self.handle_usr1)
+
         signal.signal(signal.SIGABRT, self.handle_abort)
 
         # Don't let SIGTERM and SIGUSR1 disturb active requests
@@ -164,8 +166,16 @@ class Worker(object):
     def handle_usr1(self, sig, frame):
         self.log.reopen_files()
 
+    # 通过信号控制 self.alive, 然后控制进程的状态
     def handle_exit(self, sig, frame):
+        """
+            比较Gracefully退出
+            :param sig:
+            :param frame:
+            :return:
+        """
         self.alive = False
+
 
     def handle_quit(self, sig, frame):
         self.alive = False
@@ -175,6 +185,12 @@ class Worker(object):
         sys.exit(0)
 
     def handle_abort(self, sig, frame):
+        """
+            强制退出
+        :param sig:
+        :param frame:
+        :return:
+        """
         self.alive = False
         self.cfg.worker_abort(self)
         sys.exit(1)
