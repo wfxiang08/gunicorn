@@ -10,8 +10,8 @@ import sys
 import time
 import traceback
 from random import randint
-from multiprocessing import Lock
-from multiprocessing.sharedctypes import Array
+from multiprocessing import RLock
+from multiprocessing.sharedctypes import Array, Value
 
 from gunicorn import util
 from gunicorn.workers.workertmp import WorkerTmp
@@ -48,7 +48,7 @@ class Worker(object):
 
         self.timeout = timeout
         self.cfg = cfg
-        self.booted = False
+        # self.booted = False
         self.aborted = False
         self.reloader = None
 
@@ -59,8 +59,11 @@ class Worker(object):
         self.log = log
         self.tmp = WorkerTmp(cfg)
 
+        # 告诉Master当前的URL是什么，在被堵住的情况下，可以不通知
+        lock = RLock()
+        self.current_url = Array('c', 200, lock=lock)
+        self.booted = Value('i', 0)
 
-        self.current_url = Array('c', 200, lock=Lock())
 
     def __str__(self):
         return "<Worker %s>" % self.pid
@@ -131,7 +134,8 @@ class Worker(object):
         self.load_wsgi()
 
         # Enter main run loop
-        self.booted = True
+        # self.booted = True
+        self.booted.value = 1
         self.run()
 
     def load_wsgi(self):

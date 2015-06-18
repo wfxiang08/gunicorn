@@ -56,6 +56,7 @@ class Arbiter(object):
 
     LISTENERS = []
     WORKERS = {}
+    NEW_WORKERS = {}
     PIPE = []
 
     # I love dynamic languages
@@ -94,8 +95,6 @@ class Arbiter(object):
             0: sys.executable
         }
 
-        self.is_in_manage_workers = False
-
     def _get_num_workers(self):
         return self._num_workers
 
@@ -124,6 +123,7 @@ class Arbiter(object):
             self.timeout_warning = min(self.timeout, self.timeout_warning)
         self.proc_name = self.cfg.proc_name
 
+        # 记录上一个很慢的URL
         self.pid_2_lasturl = {}
         try:
             from raven import Client
@@ -489,6 +489,9 @@ class Arbiter(object):
         # 3. spawn new workers(这个地方是风险)
 
         self.log.info(Fore.GREEN + "Spawn New Workers: %d" + Fore.RESET, self.cfg.workers)
+
+        # TODO: 太暴力
+        #       不要一口气创建太多的新的进程
         for i in range(self.cfg.workers):
             self.spawn_worker()
 
@@ -519,8 +522,9 @@ class Arbiter(object):
                     if self.sentry_client:
                         # 如何获取worker的信息呢?
                         # 相同的URL只处理一次
-                        if self.pid_2_lasturl.get(pid) != worker.current_url.value:
-                            self.pid_2_lasturl[pid] = worker.current_url.value
+                        url = worker.current_url.value
+                        if url and self.pid_2_lasturl.get(pid) != url:
+                            self.pid_2_lasturl[pid] = url
                             self.sentry_client.captureMessage('Gunicorn Worker WARNING timediff: %.3f, WARNGING THRESHOLD: %.3f, Processing URL: %s' % (diff, self.timeout_warning, worker.current_url.value))
                     continue
             except ValueError:
@@ -528,8 +532,9 @@ class Arbiter(object):
             if self.sentry_client:
                 # 如何获取worker的信息呢?
                 # 相同的URL只处理一次
-                if self.pid_2_lasturl.get(pid) != worker.current_url.value:
-                    self.pid_2_lasturl[pid] = worker.current_url.value
+                url = worker.current_url.value
+                if url and self.pid_2_lasturl.get(pid) != url:
+                    self.pid_2_lasturl[pid] = url
                     self.sentry_client.captureMessage('Gunicorn Worker timeout: %.3f, Max Allowed: %.3f, Processing URL: %s' % (diff, self.timeout, worker.current_url.value))
 
             # 这里的两种方式的区别?
@@ -564,7 +569,11 @@ class Arbiter(object):
                     if exitcode == self.APP_LOAD_ERROR:
                         reason = "App failed to load."
                         raise HaltServer(reason, self.APP_LOAD_ERROR)
+
+                    # 同步清理
                     worker = self.WORKERS.pop(wpid, None)
+                    self.NEW_WORKERS.pop(wpid, None)
+
                     if not worker:
                         continue
                     worker.tmp.close()
@@ -590,9 +599,15 @@ class Arbiter(object):
         # if self.sentry_client and len(workers) > self.num_workers:
         #     self.sentry_client.captureMessage('Gunicorn Kill Extra Workers IN manage_workers')
 
-        # 删除多余的进程
-        while len(workers) > self.num_workers:
+        # 在 self.NEW_WORKERS 没有起来时，不要轻易地杀掉旧的进程
+        for pid, worker in self.NEW_WORKERS:
+            if worker.booted.value:
+                self.NEW_WORKERS.pop(pid)
+
+        # 如果有效的进程过多，则删除部分旧的进程
+        while len(workers) - len(self.NEW_WORKERS) > self.num_workers:
             (pid, _) = workers.pop(0)
+
 
             # self.log.info("Kill Worker: %s, %s, %s", pid, len(workers), self.num_workers)
             # self.log.info(get_stack_info())
@@ -602,6 +617,7 @@ class Arbiter(object):
             self.kill_worker(pid, signal.SIGTERM)
 
         self.log.debug("{0} workers".format(len(workers)), extra={"metric": "gunicorn.workers", "value": len(workers), "mtype": "gauge"})
+
 
     def spawn_worker(self):
         self.worker_age += 1
@@ -616,6 +632,7 @@ class Arbiter(object):
         if pid != 0:
             # 主进程记住子进程的状态
             self.WORKERS[pid] = worker
+            self.NEW_WORKERS[pid] = worker
             return pid
 
         # 子进程要做什么呢?
@@ -643,7 +660,7 @@ class Arbiter(object):
         except:
             self.log.exception("Exception in worker process:\n%s",
                     traceback.format_exc())
-            if not worker.booted:
+            if not worker.booted.value:
                 sys.exit(self.WORKER_BOOT_ERROR)
             sys.exit(-1)
         finally:
@@ -682,6 +699,8 @@ class Arbiter(object):
         :attr pid: int, worker pid
         :attr sig: `signal.SIG*` value
          """
+        self.NEW_WORKERS.pop(pid, None)
+
         try:
             os.kill(pid, sig)
         except OSError as e:
