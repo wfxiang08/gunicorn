@@ -12,6 +12,7 @@ import traceback
 from random import randint
 from multiprocessing import RLock
 from multiprocessing.sharedctypes import Array, Value
+from colorama import Fore
 
 from gunicorn import util
 from gunicorn.workers.workertmp import WorkerTmp
@@ -131,7 +132,13 @@ class Worker(object):
 
         self.cfg.post_worker_init(self)
 
-        self.load_wsgi()
+        t1 = time.time()
+
+        self.log.info(Fore.MAGENTA + "----> Starting Load uwsgi, with age: %s" + Fore.RESET, self.age)
+        self.load_wsgi() # 加载wsgi
+        t2 = time.time()
+        self.log.info(Fore.MAGENTA + "----> End Load uwsgi, with age: %s, Elapsed: %.3f" + Fore.RESET, self.age, t2 - t1)
+
 
         # Enter main run loop
         # self.booted = True
