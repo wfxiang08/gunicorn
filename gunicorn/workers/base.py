@@ -10,7 +10,8 @@ import sys
 import time
 import traceback
 from random import randint
-
+from multiprocessing import Lock
+from multiprocessing.sharedctypes import Array
 
 from gunicorn import util
 from gunicorn.workers.workertmp import WorkerTmp
@@ -58,6 +59,9 @@ class Worker(object):
         self.log = log
         self.tmp = WorkerTmp(cfg)
 
+
+        self.current_url = Array('c', 200, lock=Lock())
+
     def __str__(self):
         return "<Worker %s>" % self.pid
 
@@ -91,6 +95,7 @@ class Worker(object):
 
         # start the reloader
         if self.cfg.reload:
+            # 一般Debug时才选择使用 reload
             def changed(fname):
                 self.log.info("Worker reloading: %s modified", fname)
                 os.kill(self.pid, signal.SIGQUIT)

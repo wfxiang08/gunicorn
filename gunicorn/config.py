@@ -693,6 +693,24 @@ class Timeout(Setting):
         is not tied to the length of time required to handle a single request.
         """
 
+class TimeoutWarning(Setting):
+    name = "timeout_warning"
+    section = "Worker Processes"
+    meta = "INT"
+    validator = validate_pos_int
+    type = int
+    default = 0
+    desc = """\
+        Workers silent for more than this many seconds are killed and restarted.
+
+        Generally set to thirty seconds. Only set this noticeably higher if
+        you're sure of the repercussions for sync workers. For the non sync
+        workers it just means that the worker process is still communicating and
+        is not tied to the length of time required to handle a single request.
+        """
+
+
+
 
 class GracefulTimeout(Setting):
     name = "graceful_timeout"
@@ -916,6 +934,15 @@ class Pidfile(Setting):
         A filename to use for the PID file.
 
         If not set, no PID file will be written.
+        """
+
+class SentryClient(Setting):
+    name = "sentry_client"
+    section = "Server Mechanics"
+    validator = validate_string
+    default = None
+    desc = """\
+        A Sentry Client for send exception to sentry
         """
 
 class WorkerTmpDir(Setting):
@@ -1590,6 +1617,10 @@ class OnExit(Setting):
 
         The callable needs to accept a single instance variable for the Arbiter.
         """
+
+
+
+
 
 
 class ProxyProtocol(Setting):

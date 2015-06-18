@@ -20,6 +20,22 @@ from gunicorn import util
 
 from gunicorn import __version__, SERVER_SOFTWARE
 
+from colorama import init
+init()
+from colorama import Fore, Back, Style
+
+
+
+def get_stack_info():
+    import inspect
+    stacks = inspect.stack()
+    results = []
+    for stack in stacks:
+        # filename, lineno, function, code_context, index
+        func_name = "%s %s %s" % (stack[1], stack[3], stack[2])
+        results.append(func_name)
+    return "\n".join(results)
+
 
 class Arbiter(object):
     """
@@ -49,6 +65,8 @@ class Arbiter(object):
     # 保留一般的信号
     SIG_NAMES = dict((getattr(signal, name), name[3:].lower()) for name in dir(signal) if name[:3] == "SIG" and name[3] != "_")
 
+
+
     def __init__(self, app):
         os.environ["SERVER_SOFTWARE"] = SERVER_SOFTWARE
 
@@ -76,6 +94,8 @@ class Arbiter(object):
             0: sys.executable
         }
 
+        self.is_in_manage_workers = False
+
     def _get_num_workers(self):
         return self._num_workers
 
@@ -99,7 +119,17 @@ class Arbiter(object):
         self.address = self.cfg.address
         self.num_workers = self.cfg.workers
         self.timeout = self.cfg.timeout
+        self.timeout_warning = self.cfg.timeout_warning or self.timeout
+        if self.timeout:
+            self.timeout_warning = min(self.timeout, self.timeout_warning)
         self.proc_name = self.cfg.proc_name
+
+        self.pid_2_lasturl = {}
+        try:
+            from raven import Client
+            self.sentry_client = Client(self.cfg.sentry_client)
+        except:
+            self.sentry_client = None
 
         self.log.debug('Current configuration:\n{0}'.format(
             '\n'.join(
@@ -123,7 +153,7 @@ class Arbiter(object):
         """
         self.log.info("Starting gunicorn %s", __version__)
 
-        # 保存pid
+        # 1. 保存pid
         self.pid = os.getpid()
         if self.cfg.pidfile is not None:
             self.pidfile = Pidfile(self.cfg.pidfile)
@@ -131,7 +161,10 @@ class Arbiter(object):
 
         self.cfg.on_starting(self)
 
+        # 2. 设置signals
         self.init_signals()
+
+        # 3. 设置listeners
         if not self.LISTENERS:
             self.LISTENERS = create_sockets(self.cfg, self.log)
 
@@ -207,7 +240,8 @@ class Arbiter(object):
                 if not handler:
                     self.log.error("Unhandled signal: %s", signame)
                     continue
-                self.log.info("Handling signal: %s", signame)
+
+                self.log.info(Fore.MAGENTA + "----> Handling signal: %s" + Fore.RESET, signame)
 
                 # 如果存在handler, 则调用handler(处理信号)
                 handler()
@@ -224,8 +258,7 @@ class Arbiter(object):
             except SystemExit:
                 raise
             except Exception:
-                self.log.info("Unhandled exception in main loop:\n%s",
-                            traceback.format_exc())
+                self.log.info("Unhandled exception in main loop:\n%s", traceback.format_exc())
                 self.stop(False)
                 if self.pidfile is not None:
                     self.pidfile.unlink()
@@ -300,6 +333,7 @@ class Arbiter(object):
         if self.cfg.daemon:
             self.log.info("graceful stop of workers")
             self.num_workers = 0
+            # 停止所有的workers
             self.kill_workers(signal.SIGTERM)
         else:
             self.log.debug("SIGWINCH ignored. Not daemonized")
@@ -453,11 +487,16 @@ class Arbiter(object):
         util._setproctitle("master [%s]" % self.proc_name)
 
         # 3. spawn new workers(这个地方是风险)
+
+        self.log.info(Fore.GREEN + "Spawn New Workers: %d" + Fore.RESET, self.cfg.workers)
         for i in range(self.cfg.workers):
             self.spawn_worker()
 
         # 4. manage workers
         self.manage_workers()
+
+
+
 
     def murder_workers(self):
         """\
@@ -466,20 +505,37 @@ class Arbiter(object):
         if not self.timeout:
             return
 
+        # 1.0s执行一次
+
         # 如果有 timeout控制, 则检查时间timeout
         workers = list(self.WORKERS.items())
         for (pid, worker) in workers:
+            diff = time.time() - worker.tmp.last_update()
             try:
                 # 如果没有超时
-                if time.time() - worker.tmp.last_update() <= self.timeout:
+                if diff < self.timeout_warning:
+                    continue
+                elif diff <= self.timeout:
+                    if self.sentry_client:
+                        # 如何获取worker的信息呢?
+                        # 相同的URL只处理一次
+                        if self.pid_2_lasturl.get(pid) != worker.current_url.value:
+                            self.pid_2_lasturl[pid] = worker.current_url.value
+                            self.sentry_client.captureMessage('Gunicorn Worker WARNING timediff: %.3f, WARNGING THRESHOLD: %.3f, Processing URL: %s' % (diff, self.timeout_warning, worker.current_url.value))
                     continue
             except ValueError:
                 continue
+            if self.sentry_client:
+                # 如何获取worker的信息呢?
+                # 相同的URL只处理一次
+                if self.pid_2_lasturl.get(pid) != worker.current_url.value:
+                    self.pid_2_lasturl[pid] = worker.current_url.value
+                    self.sentry_client.captureMessage('Gunicorn Worker timeout: %.3f, Max Allowed: %.3f, Processing URL: %s' % (diff, self.timeout, worker.current_url.value))
 
             # 这里的两种方式的区别?
             # signal.SIGTERM 是一种种比较温顺的方法(不过已经timeout, 说明这种方法失效了)
             if not worker.aborted:
-                self.log.critical("WORKER TIMEOUT (pid:%s)", pid)
+                self.log.critical(Fore.RED + "WORKER TIMEOUT (pid:%s), Timeout: %s"+ Fore.RESET, pid, self.timeout)
                 worker.aborted = True
                 self.kill_worker(pid, signal.SIGABRT)
             else:
@@ -516,11 +572,13 @@ class Arbiter(object):
             if e.errno != errno.ECHILD:
                 raise
 
+
     def manage_workers(self):
         """\
         Maintain the number of workers by spawning or killing
         as required.
         """
+
         # 不够则增加爱
         if len(self.WORKERS.keys()) < self.num_workers:
             self.spawn_workers()
@@ -529,11 +587,18 @@ class Arbiter(object):
         workers = self.WORKERS.items()
         workers = sorted(workers, key=lambda w: w[1].age) # age是如何计算的？ age应该是出生的日期吧? 越新的worker的age越大
 
+        # if self.sentry_client and len(workers) > self.num_workers:
+        #     self.sentry_client.captureMessage('Gunicorn Kill Extra Workers IN manage_workers')
+
         # 删除多余的进程
         while len(workers) > self.num_workers:
             (pid, _) = workers.pop(0)
 
+            # self.log.info("Kill Worker: %s, %s, %s", pid, len(workers), self.num_workers)
+            # self.log.info(get_stack_info())
+
             # 让多余的Process干完活了，就自己解决自己
+            # KILL并不一定马上执行，因此 manage_workers 极可能在reload, 也可能在run中使用
             self.kill_worker(pid, signal.SIGTERM)
 
         self.log.debug("{0} workers".format(len(workers)), extra={"metric": "gunicorn.workers", "value": len(workers), "mtype": "gauge"})
@@ -563,7 +628,7 @@ class Arbiter(object):
 
             self.cfg.post_fork(self, worker)
 
-            # 进程开始工作?
+            # 进程开始工作
             worker.init_process()
 
 
@@ -571,8 +636,7 @@ class Arbiter(object):
         except SystemExit:
             raise
         except AppImportError as e:
-            self.log.debug("Exception while loading the application: \n%s",
-                    traceback.format_exc())
+            self.log.debug("Exception while loading the application: \n%s", traceback.format_exc())
             print("%s" % e, file=sys.stderr)
             sys.stderr.flush()
             sys.exit(self.APP_LOAD_ERROR)

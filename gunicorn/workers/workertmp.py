@@ -51,6 +51,10 @@ class WorkerTmp(object):
             os.write(self._tmp.fileno(), b"X")
 
     def last_update(self):
+        """
+            获取临时文件的修改时间
+            :return:
+        """
         return os.fstat(self._tmp.fileno()).st_ctime
 
     def fileno(self):

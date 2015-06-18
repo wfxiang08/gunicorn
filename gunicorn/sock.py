@@ -172,13 +172,14 @@ def create_sockets(conf, log):
     # get it only once
     laddr = conf.address
 
+    # 暂时不考虑Key/Certfile
     # check ssl config early to raise the error on startup
     # only the certfile is needed since it can contains the keyfile
-    if conf.certfile and not os.path.exists(conf.certfile):
-        raise ValueError('certfile "%s" does not exist' % conf.certfile)
-
-    if conf.keyfile and not os.path.exists(conf.keyfile):
-        raise ValueError('keyfile "%s" does not exist' % conf.keyfile)
+    # if conf.certfile and not os.path.exists(conf.certfile):
+    #     raise ValueError('certfile "%s" does not exist' % conf.certfile)
+    #
+    # if conf.keyfile and not os.path.exists(conf.keyfile):
+    #     raise ValueError('keyfile "%s" does not exist' % conf.keyfile)
 
     # sockets are already bound
     if 'GUNICORN_FD' in os.environ:

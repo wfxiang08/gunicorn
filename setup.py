@@ -70,6 +70,7 @@ class PyTestCommand(TestCommand):
         errno = pytest.main(self.test_args)
         sys.exit(errno)
 
+
 setup(
     name='gunicorn',
     version=__version__,
@@ -85,7 +86,7 @@ setup(
     zip_safe=False,
     packages=find_packages(exclude=['examples', 'tests']),
     include_package_data=True,
-
+    install_requires=['setproctitle >= 1.1.8', 'colorama >= 0.3.2'],
     tests_require=tests_require,
     cmdclass={'test': PyTestCommand},
 

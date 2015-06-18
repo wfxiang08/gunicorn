@@ -4,5 +4,5 @@
 # See the NOTICE for more information.
 
 version_info = (19, 3, 0)
-__version__ = ".".join([str(v) for v in version_info])
+__version__ = "19.3.0.cy"
 SERVER_SOFTWARE = "gunicorn/%s" % __version__

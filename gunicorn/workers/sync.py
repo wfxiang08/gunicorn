@@ -18,10 +18,14 @@ import gunicorn.util as util
 import gunicorn.workers.base as base
 from gunicorn import six
 
+
 class StopWaiting(Exception):
     """ exception raised to stop waiting for a connnection """
 
 class SyncWorker(base.Worker):
+    def __init__(self, age, ppid, sockets, app, timeout, cfg, log):
+        super(SyncWorker, self).__init__(age, ppid, sockets, app, timeout, cfg, log)
+
 
     def accept(self, listener):
         client, addr = listener.accept()
@@ -78,8 +82,7 @@ class SyncWorker(base.Worker):
                 continue
 
             except socket.error as e:
-                if e.args[0] not in (errno.EAGAIN, errno.ECONNABORTED,
-                        errno.EWOULDBLOCK):
+                if e.args[0] not in (errno.EAGAIN, errno.ECONNABORTED, errno.EWOULDBLOCK):
                     raise
 
             if not self.is_parent_alive():
@@ -105,8 +108,7 @@ class SyncWorker(base.Worker):
                     try:
                         self.accept(listener)
                     except socket.error as e:
-                        if e.args[0] not in (errno.EAGAIN, errno.ECONNABORTED,
-                                errno.EWOULDBLOCK):
+                        if e.args[0] not in (errno.EAGAIN, errno.ECONNABORTED, errno.EWOULDBLOCK):
                             raise
 
             if not self.is_parent_alive():
@@ -193,6 +195,10 @@ class SyncWorker(base.Worker):
             # environ 还不是一个正式的Request, 而是带有RAW数据的Http请求
             # gunicorn是工作在http协议层的，中间有不少环境是用来解析http数据的
             #
+            # 如何记录这个状态呢?
+            url = environ['RAW_URI']
+            self.current_url.value = url[:180] # 限制最大的长度
+
             respiter = self.wsgi(environ, resp.start_response)
 
             try:

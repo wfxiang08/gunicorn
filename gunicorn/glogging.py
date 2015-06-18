@@ -181,30 +181,23 @@ class Logger(object):
         self.access_log.setLevel(logging.INFO)
 
         # set gunicorn.error handler
-        self._set_handler(self.error_log, cfg.errorlog,
-                logging.Formatter(self.error_fmt, self.datefmt))
+        self._set_handler(self.error_log, cfg.errorlog, logging.Formatter(self.error_fmt, self.datefmt))
 
         # set gunicorn.access handler
         if cfg.accesslog is not None:
-            self._set_handler(self.access_log, cfg.accesslog,
-                fmt=logging.Formatter(self.access_fmt))
+            self._set_handler(self.access_log, cfg.accesslog, fmt=logging.Formatter(self.access_fmt))
 
         # set syslog handler
         if cfg.syslog:
-            self._set_syslog_handler(
-                self.error_log, cfg, self.syslog_fmt, "error"
-            )
-            self._set_syslog_handler(
-                self.access_log, cfg, self.syslog_fmt, "access"
-            )
+            self._set_syslog_handler(self.error_log, cfg, self.syslog_fmt, "error")
+            self._set_syslog_handler(self.access_log, cfg, self.syslog_fmt, "access")
 
         if cfg.logconfig:
             if os.path.exists(cfg.logconfig):
                 defaults = CONFIG_DEFAULTS.copy()
                 defaults['__file__'] = cfg.logconfig
                 defaults['here'] = os.path.dirname(cfg.logconfig)
-                fileConfig(cfg.logconfig, defaults=defaults,
-                           disable_existing_loggers=False)
+                fileConfig(cfg.logconfig, defaults=defaults,disable_existing_loggers=False)
             else:
                 msg = "Error: log config '%s' not found"
                 raise RuntimeError(msg % cfg.logconfig)
@@ -219,6 +212,13 @@ class Logger(object):
         self.error_log.warning(msg, *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):
+        """
+        通过error_log打印一些信息
+        :param msg:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         self.error_log.info(msg, *args, **kwargs)
 
     def debug(self, msg, *args, **kwargs):

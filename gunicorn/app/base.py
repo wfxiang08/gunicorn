@@ -114,7 +114,7 @@ class Application(BaseApplication):
         Loads the configuration file: the file is a python file, otherwise raise an RuntimeError
         Exception or stop the process if the configuration file contains a syntax error.
         """
-
+        # 如何理解location呢?
         try:
             cfg = self.get_config_from_module_name(module_name=location)
         except ImportError:
