@@ -146,6 +146,10 @@ class Worker(object):
         self.run()
 
     def load_wsgi(self):
+        """
+            这里的wsgi只是一个RPC的Handler
+        :return:
+        """
         try:
             self.wsgi = self.app.wsgi()
         except SyntaxError as e:

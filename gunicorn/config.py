@@ -94,7 +94,7 @@ class Config(object):
 
     @property
     def worker_class(self):
-        uri = self.settings['worker_class'].get()
+        uri = "ggevent"
 
         # 加载worker_class
         worker_class = util.load_class(uri)

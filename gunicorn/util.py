@@ -96,7 +96,7 @@ relative import to an absolute import.
         return sys.modules[name]
 
 
-def load_class(uri, default="gunicorn.workers.sync.SyncWorker", section="gunicorn.workers"):
+def load_class(uri, default="gunicorn.workers.sync.ggevent", section="gunicorn.workers"):
     if inspect.isclass(uri):
         return uri
     if uri.startswith("egg:"):

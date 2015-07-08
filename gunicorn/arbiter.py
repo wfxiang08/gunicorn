@@ -21,6 +21,8 @@ from gunicorn import util
 from gunicorn import __version__, SERVER_SOFTWARE
 
 from colorama import init
+from gunicorn.workers.ggevent import GeventWorker
+
 init()
 from colorama import Fore, Back, Style
 
@@ -113,14 +115,15 @@ class Arbiter(object):
         if 'GUNICORN_FD' in os.environ:
             self.log.reopen_files()
 
-        # SyncWorker
-        self.worker_class = self.cfg.worker_class
+
+
         self.address = self.cfg.address
         self.num_workers = self.cfg.workers
         self.timeout = self.cfg.timeout
         self.timeout_warning = self.cfg.timeout_warning or self.timeout
         if self.timeout:
             self.timeout_warning = min(self.timeout, self.timeout_warning)
+
         self.proc_name = self.cfg.proc_name
 
         # 记录上一个很慢的URL
@@ -174,8 +177,8 @@ class Arbiter(object):
         self.log.info("Using worker: %s", self.cfg.worker_class_str)
 
         # check worker class requirements
-        if hasattr(self.worker_class, "check_config"):
-            self.worker_class.check_config(self.cfg, self.log)
+        if hasattr(GeventWorker, "check_config"):
+            GeventWorker.check_config(self.cfg, self.log)
 
         self.cfg.when_ready(self)
 
@@ -626,7 +629,7 @@ class Arbiter(object):
         # worker_class
         # 参考: gunicorn.workers.xxxx
         #
-        worker = self.worker_class(self.worker_age, self.pid, self.LISTENERS, self.app, self.timeout / 2.0, self.cfg, self.log)
+        worker = GeventWorker(self.worker_age, self.pid, self.LISTENERS, self.app, self.timeout / 2.0, self.cfg, self.log)
         self.cfg.pre_fork(self, worker)
 
         pid = os.fork()

@@ -103,13 +103,6 @@ Documentation
 19.0 / 2014-06-12
 =================
 
-Gunicorn 19.0 is a major release with new features and fixes. This
-version improve a lot the usage of Gunicorn with python 3 by adding `two
-new workers <http://docs.gunicorn.org/en/latest/design.html#asyncio-workers>`_
-to it: `gthread` a fully threaded async worker using futures and `gaiohttp` a
-worker using asyncio.
-
-
 Breaking Changes
 ----------------
 
