@@ -9,8 +9,8 @@ import socket
 import logging
 from re import sub
 
-from gunicorn.glogging import Logger
-from gunicorn import six
+from gunicorn_zmq.glogging import Logger
+from gunicorn_zmq import six
 
 # Instrumentation constants
 STATSD_DEFAULT_PORT = 8125

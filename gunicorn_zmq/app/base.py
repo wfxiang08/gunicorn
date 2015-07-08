@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -
 #
-# This file is part of gunicorn released under the MIT license.
+# This file is part of gunicorn_zmq released under the MIT license.
 # See the NOTICE for more information.
 from __future__ import print_function
 
@@ -8,11 +8,11 @@ import os
 import sys
 import traceback
 
-from gunicorn._compat import execfile_
-from gunicorn import util
-from gunicorn.arbiter import Arbiter
-from gunicorn.config import Config, get_default_config_file
-from gunicorn import debug
+from gunicorn_zmq._compat import execfile_
+from gunicorn_zmq import util
+from gunicorn_zmq.arbiter import Arbiter
+from gunicorn_zmq.config import Config, get_default_config_file
+from gunicorn_zmq import debug
 
 class BaseApplication(object):
     """
@@ -64,7 +64,7 @@ class BaseApplication(object):
         if self.cfg.spew:
             debug.spew()
 
-    def wsgi(self):
+    def zmq_server(self):
         """
             读物 wsgi callable
             :return:

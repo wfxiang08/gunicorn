@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -
 #
-# This file is part of gunicorn released under the MIT license.
+# This file is part of gunicorn_zmq released under the MIT license.
 # See the NOTICE for more information.
 
 # Please remember to run "make -C docs html" after update "desc" attributes.
@@ -18,11 +18,11 @@ import ssl
 import sys
 import textwrap
 
-from gunicorn import __version__
-from gunicorn import _compat
-from gunicorn.errors import ConfigError
-from gunicorn import six
-from gunicorn import util
+from gunicorn_zmq import __version__
+from gunicorn_zmq import _compat
+from gunicorn_zmq.errors import ConfigError
+from gunicorn_zmq import six
+from gunicorn_zmq import util
 
 KNOWN_SETTINGS = []
 PLATFORM = sys.platform
@@ -136,16 +136,16 @@ class Config(object):
         uri = self.settings['logger_class'].get()
         if uri == "simple":
             # support the default
-            uri = "gunicorn.glogging.Logger"
+            uri = "gunicorn_zmq.glogging.Logger"
 
         # if statsd is on, automagically switch to the statsd logger
         if 'statsd_host' in self.settings and self.settings['statsd_host'].value is not None:
-            logger_class = util.load_class("gunicorn.instrument.statsd.Statsd",
-                section="gunicorn.loggers")
+            logger_class = util.load_class("gunicorn_zmq.instrument.statsd.Statsd",
+                section="gunicorn_zmq.loggers")
         else:
             logger_class = util.load_class(uri,
-                default="gunicorn.glogging.Logger",
-                section="gunicorn.loggers")
+                default="gunicorn_zmq.glogging.Logger",
+                section="gunicorn_zmq.loggers")
 
         if hasattr(logger_class, "install"):
             logger_class.install()
@@ -464,7 +464,7 @@ def validate_hostport(val):
 
 def get_default_config_file():
     config_path = os.path.join(os.path.abspath(os.getcwd()),
-            'gunicorn.conf.py')
+            'gunicorn_zmq.conf.py')
     if os.path.exists(config_path):
         return config_path
     return None
@@ -478,7 +478,7 @@ class ConfigFile(Setting):
     validator = validate_string
     default = None
     desc = """\
-        The path to a Gunicorn config file, or python module.
+        The path to a gunicorn_zmq config file, or python module.
 
         Only has an effect when specified on the command line or as part of an
         application specific configuration.
@@ -505,7 +505,7 @@ class Bind(Setting):
 
         Multiple addresses can be bound. ex.::
 
-            $ gunicorn -b 127.0.0.1:8000 -b [::1]:8000 test:app
+            $ gunicorn_zmq -b 127.0.0.1:8000 -b [::1]:8000 test:app
 
         will bind the `test:app` application on localhost both on ipv6
         and ipv4 interfaces.
@@ -568,7 +568,7 @@ class WorkerClass(Setting):
 
         The default class (sync) should handle most 'normal' types of
         workloads.  You'll want to read
-        http://docs.gunicorn.org/en/latest/design.html for information
+        http://docs.gunicorn_zmq.org/en/latest/design.html for information
         on when you might want to choose one of the other worker
         classes.
 
@@ -579,11 +579,11 @@ class WorkerClass(Setting):
         * ``gevent``   - Requires gevent >= 0.13
         * ``tornado``  - Requires tornado >= 0.2
 
-        Optionally, you can provide your own worker by giving gunicorn a
-        python path to a subclass of gunicorn.workers.base.Worker. This
+        Optionally, you can provide your own worker by giving gunicorn_zmq a
+        python path to a subclass of gunicorn_zmq.workers.base.Worker. This
         alternative syntax will load the gevent class:
-        ``gunicorn.workers.ggevent.GeventWorker``. Alternatively the syntax
-        can also load the gevent class with ``egg:gunicorn#gevent``
+        ``gunicorn_zmq.workers.ggevent.GeventWorker``. Alternatively the syntax
+        can also load the gevent class with ``egg:gunicorn_zmq#gevent``
         """
 
 class WorkerThreads(Setting):
@@ -882,7 +882,7 @@ class Daemon(Setting):
     action = "store_true"
     default = False
     desc = """\
-        Daemonize the Gunicorn process.
+        Daemonize the gunicorn_zmq process.
 
         Detaches the server from the controlling terminal and enters the
         background.
@@ -902,7 +902,7 @@ class Env(Setting):
 
         Pass variables to the execution environment. Ex.::
 
-            $ gunicorn -b 127.0.0.1:8000 --env FOO=1 test:app
+            $ gunicorn_zmq -b 127.0.0.1:8000 --env FOO=1 test:app
 
         and test for the foo variable environment in your application.
         """
@@ -984,7 +984,7 @@ class Umask(Setting):
     type = int
     default = 0
     desc = """\
-        A bit mask for the file mode on files written by Gunicorn.
+        A bit mask for the file mode on files written by gunicorn_zmq.
 
         Note that this affects unix socket permissions.
 
@@ -1005,8 +1005,8 @@ class TmpUploadDir(Setting):
 
         This may disappear in the near future.
 
-        This path should be writable by the process permissions set for Gunicorn
-        workers. If not specified, Gunicorn will choose a system generated
+        This path should be writable by the process permissions set for gunicorn_zmq
+        workers. If not specified, gunicorn_zmq will choose a system generated
         temporary directory.
         """
 
@@ -1023,7 +1023,7 @@ class SecureSchemeHeader(Setting):
     desc = """\
 
         A dictionary containing headers and values that the front-end proxy
-        uses to indicate HTTPS requests. These tell gunicorn to set
+        uses to indicate HTTPS requests. These tell gunicorn_zmq to set
         wsgi.url_scheme to "https", so your application can tell that the
         request is secure.
 
@@ -1144,17 +1144,17 @@ class LoggerClass(Setting):
     cli = ["--logger-class"]
     meta = "STRING"
     validator = validate_class
-    default = "gunicorn.glogging.Logger"
+    default = "gunicorn_zmq.glogging.Logger"
     desc = """\
-        The logger you want to use to log events in gunicorn.
+        The logger you want to use to log events in gunicorn_zmq.
 
-        The default class (``gunicorn.glogging.Logger``) handle most of
+        The default class (``gunicorn_zmq.glogging.Logger``) handle most of
         normal usages in logging. It provides error and access logging.
 
-        You can provide your own worker by giving gunicorn a
-        python path to a subclass like gunicorn.glogging.Logger.
+        You can provide your own worker by giving gunicorn_zmq a
+        python path to a subclass like gunicorn_zmq.glogging.Logger.
         Alternatively the syntax can also load the Logger class
-        with `egg:gunicorn#simple`
+        with `egg:gunicorn_zmq#simple`
         """
 
 
@@ -1167,7 +1167,7 @@ class LogConfig(Setting):
     default = None
     desc = """\
     The log config file to use.
-    Gunicorn uses the standard Python logging module's Configuration
+    gunicorn_zmq uses the standard Python logging module's Configuration
     file format.
     """
 
@@ -1210,7 +1210,7 @@ class Syslog(Setting):
     action = 'store_true'
     default = False
     desc = """\
-    Send *Gunicorn* logs to syslog.
+    Send *gunicorn_zmq* logs to syslog.
     """
 
 
@@ -1222,9 +1222,9 @@ class SyslogPrefix(Setting):
     validator = validate_string
     default = None
     desc = """\
-    Makes gunicorn use the parameter as program-name in the syslog entries.
+    Makes gunicorn_zmq use the parameter as program-name in the syslog entries.
 
-    All entries will be prefixed by gunicorn.<prefix>. By default the program
+    All entries will be prefixed by gunicorn_zmq.<prefix>. By default the program
     name is the name of the process.
     """
 
@@ -1298,11 +1298,11 @@ class Procname(Setting):
         A base to use with setproctitle for process naming.
 
         This affects things like ``ps`` and ``top``. If you're going to be
-        running more than one instance of Gunicorn you'll probably want to set a
+        running more than one instance of gunicorn_zmq you'll probably want to set a
         name to tell them apart. This requires that you install the setproctitle
         module.
 
-        It defaults to 'gunicorn'.
+        It defaults to 'gunicorn_zmq'.
         """
 
 
@@ -1310,7 +1310,7 @@ class DefaultProcName(Setting):
     name = "default_proc_name"
     section = "Process Naming"
     validator = validate_string
-    default = "gunicorn"
+    default = "gunicorn_zmq"
     desc = """\
         Internal setting that is adjusted for each type of application.
         """
@@ -1598,7 +1598,7 @@ class OnExit(Setting):
 
     default = staticmethod(on_exit)
     desc = """\
-        Called just before exiting gunicorn.
+        Called just before exiting gunicorn_zmq.
 
         The callable needs to accept a single instance variable for the Arbiter.
         """
@@ -1619,7 +1619,7 @@ class ProxyProtocol(Setting):
         Enable detect PROXY protocol (PROXY mode).
 
         Allow using Http and Proxy together. It may be useful for work with
-        stunnel as https frontend and gunicorn as http server.
+        stunnel as https frontend and gunicorn_zmq as http server.
 
         PROXY protocol: http://haproxy.1wt.eu/download/1.5/doc/proxy-protocol.txt
 

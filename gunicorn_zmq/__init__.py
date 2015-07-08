@@ -5,4 +5,4 @@
 
 version_info = (19, 3, 0)
 __version__ = "19.3.0.cy"
-SERVER_SOFTWARE = "gunicorn/%s" % __version__
+SERVER_SOFTWARE = "gunicorn_zmq/%s" % __version__

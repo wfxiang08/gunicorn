@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -
 #
-# This file is part of gunicorn released under the MIT license.
+# This file is part of gunicorn_zmq released under the MIT license.
 # See the NOTICE for more information.
 from __future__ import print_function
 
@@ -13,22 +13,24 @@ import sys
 import time
 import traceback
 
-from gunicorn.errors import HaltServer, AppImportError
-from gunicorn.pidfile import Pidfile
-from gunicorn.sock import create_sockets
-from gunicorn import util
-
-from gunicorn import __version__, SERVER_SOFTWARE
-
 from colorama import init
-from gunicorn.workers.ggevent import GeventWorker
+
+from gunicorn_zmq.errors import HaltServer, AppImportError
+from gunicorn_zmq.pidfile import Pidfile
+from gunicorn_zmq.sock import create_sockets
+from gunicorn_zmq import util
+from gunicorn_zmq import __version__, SERVER_SOFTWARE
+from gunicorn_zmq.workers.ggevent import GeventWorker
+
 
 init()
-from colorama import Fore, Back, Style
-
+from colorama import Fore
 
 
 def get_stack_info():
+    """
+    打印当前的Stack, 便于Debug
+    """
     import inspect
     stacks = inspect.stack()
     results = []
@@ -85,7 +87,7 @@ class Arbiter(object):
 
         cwd = util.getcwd()
 
-        # gunicorn --workers=2 test:app
+        # gunicorn_zmq --workers=2 test:app
         # python test:app ?
         args = sys.argv[:]
         args.insert(0, sys.executable)
@@ -112,7 +114,7 @@ class Arbiter(object):
         self.log = self.cfg.logger_class(app.cfg)
 
         # reopen files
-        if 'GUNICORN_FD' in os.environ:
+        if 'gunicorn_zmq_FD' in os.environ:
             self.log.reopen_files()
 
 
@@ -148,13 +150,13 @@ class Arbiter(object):
 
         # 加载wsgi app(加载之后是否存在问题: 例如重新创建一个worker, 但是代码可能不会更新?)
         if self.cfg.preload_app:
-            self.app.wsgi()
+            self.app.zmq_server()
 
     def start(self):
         """\
         Initialize the arbiter. Start listening and set pidfile if needed.
         """
-        self.log.info("Starting gunicorn %s", __version__)
+        self.log.info("Starting gunicorn_zmq %s", __version__)
 
         # 1. 保存pid
         self.pid = os.getpid()
@@ -424,7 +426,7 @@ class Arbiter(object):
         # 使用之前的环境变量重新创建一个环境
         environ = self.cfg.env_orig.copy()
         fds = [l.fileno() for l in self.LISTENERS]
-        environ['GUNICORN_FD'] = ",".join([str(fd) for fd in fds])
+        environ['gunicorn_zmq_FD'] = ",".join([str(fd) for fd in fds])
 
         os.chdir(self.START_CTX['cwd'])
         self.cfg.pre_exec(self)
@@ -443,10 +445,10 @@ class Arbiter(object):
         for k in self.cfg.env:
             if k in self.cfg.env_orig:
                 # reset the key to the value it had before
-                # we launched gunicorn
+                # we launched gunicorn_zmq
                 os.environ[k] = self.cfg.env_orig[k]
             else:
-                # delete the value set by gunicorn
+                # delete the value set by gunicorn_zmq
                 try:
                     del os.environ[k]
                 except KeyError:
@@ -528,7 +530,7 @@ class Arbiter(object):
                         url = worker.current_url.value
                         if url and self.pid_2_lasturl.get(pid) != url:
                             self.pid_2_lasturl[pid] = url
-                            self.sentry_client.captureMessage('Gunicorn Worker WARNING timediff: %.3f, WARNGING THRESHOLD: %.3f, Processing URL: %s' % (diff, self.timeout_warning, worker.current_url.value))
+                            self.sentry_client.captureMessage('gunicorn_zmq Worker WARNING timediff: %.3f, WARNGING THRESHOLD: %.3f, Processing URL: %s' % (diff, self.timeout_warning, worker.current_url.value))
                     continue
             except ValueError: # 说明Worker已经挂了或者还没有初始化?
                 continue
@@ -539,7 +541,7 @@ class Arbiter(object):
                 url = worker.current_url.value
                 if url and self.pid_2_lasturl.get(pid) != url:
                     self.pid_2_lasturl[pid] = url
-                    self.sentry_client.captureMessage('Gunicorn Worker timeout: %.3f, Max Allowed: %.3f, Processing URL: %s' % (diff, self.timeout, worker.current_url.value))
+                    self.sentry_client.captureMessage('gunicorn_zmq Worker timeout: %.3f, Max Allowed: %.3f, Processing URL: %s' % (diff, self.timeout, worker.current_url.value))
 
             # 这里的两种方式的区别?
             # signal.SIGTERM 是一种种比较温顺的方法(不过已经timeout, 说明这种方法失效了)
@@ -601,7 +603,7 @@ class Arbiter(object):
         workers = sorted(workers, key=lambda w: w[1].age) # age是如何计算的？ age应该是出生的日期吧? 越新的worker的age越大
 
         # if self.sentry_client and len(workers) > self.num_workers:
-        #     self.sentry_client.captureMessage('Gunicorn Kill Extra Workers IN manage_workers')
+        #     self.sentry_client.captureMessage('gunicorn_zmq Kill Extra Workers IN manage_workers')
 
         # 在 self.NEW_WORKERS 没有起来时，不要轻易地杀掉旧的进程
         for pid, worker in list(self.NEW_WORKERS.items()):
@@ -620,16 +622,16 @@ class Arbiter(object):
             # KILL并不一定马上执行，因此 manage_workers 极可能在reload, 也可能在run中使用
             self.kill_worker(pid, signal.SIGTERM)
 
-        self.log.debug("{0} workers".format(len(workers)), extra={"metric": "gunicorn.workers", "value": len(workers), "mtype": "gauge"})
+        self.log.debug("{0} workers".format(len(workers)), extra={"metric": "gunicorn_zmq.workers", "value": len(workers), "mtype": "gauge"})
 
 
     def spawn_worker(self):
         self.worker_age += 1
 
         # worker_class
-        # 参考: gunicorn.workers.xxxx
+        # 参考: gunicorn_zmq.workers.xxxx
         #
-        # 只支持绑定到一个ip/port
+        # 只支持绑定到一个ip
         worker = GeventWorker(self.worker_age, self.pid, self.LISTENERS[0], self.app, self.timeout / 2.0, self.cfg, self.log)
         self.cfg.pre_fork(self, worker)
 

@@ -12,8 +12,8 @@ import socket
 import sys
 import traceback
 
-from gunicorn import util
-from gunicorn.six import string_types
+from gunicorn_zmq import util
+from gunicorn_zmq.six import string_types
 
 
 # syslog facility codes

@@ -9,7 +9,6 @@ import email.utils
 import fcntl
 import io
 import os
-import pkg_resources
 import random
 import resource
 import socket
@@ -22,9 +21,11 @@ import errno
 import warnings
 import cgi
 
-from gunicorn.errors import AppImportError
-from gunicorn.six import text_type
-from gunicorn.workers import SUPPORTED_WORKERS
+import pkg_resources
+
+from gunicorn_zmq.errors import AppImportError
+from gunicorn_zmq.six import text_type
+from gunicorn_zmq.workers import SUPPORTED_WORKERS
 
 
 MAXFD = 1024

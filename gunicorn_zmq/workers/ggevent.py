@@ -18,11 +18,10 @@ import zmq
 import gevent
 from gevent.pool import Pool
 
-from gunicorn import util
-from gunicorn.workers.workertmp import WorkerTmp
-from gunicorn.reloader import Reloader
-from gunicorn.six import MAXSIZE
-import gunicorn
+from gunicorn_zmq import util
+from gunicorn_zmq.workers.workertmp import WorkerTmp
+from gunicorn_zmq.reloader import Reloader
+from gunicorn_zmq.six import MAXSIZE
 
 
 if sys.platform == "darwin":

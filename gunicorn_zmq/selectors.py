@@ -13,8 +13,8 @@ import math
 import select
 import sys
 
-from gunicorn._compat import wrap_error, InterruptedError
-from gunicorn import six
+from gunicorn_zmq._compat import wrap_error, InterruptedError
+from gunicorn_zmq import six
 
 
 # generic events, that must be mapped to implementation-specific ones

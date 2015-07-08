@@ -72,13 +72,13 @@ class PyTestCommand(TestCommand):
 
 
 setup(
-    name='gunicorn',
+    name='gunicorn_zmq',
     version=__version__,
 
-    description='WSGI HTTP Server for UNIX',
+    description='zeromq & gevent & gunicorn server',
     long_description=long_description,
-    author='Benoit Chesneau',
-    author_email='benoitc@e-engura.com',
+    author='wfxiang08',
+    author_email='wfxiang08@gmail.com',
     license='MIT',
     url='http://gunicorn.org',
 
@@ -98,11 +98,6 @@ setup(
     #
     entry_points="""
     [console_scripts]
-    gunicorn=gunicorn.app.wsgiapp:run
-    gunicorn_django=gunicorn.app.djangoapp:run
-    gunicorn_paster=gunicorn.app.pasterapp:run
-
-    [paste.server_runner]
-    main=gunicorn.app.pasterapp:paste_server
+    gunicorn_zmq=gunicorn_zmq.app.wsgiapp:run
     """
 )

@@ -7,10 +7,9 @@ import os
 import platform
 import tempfile
 
-from gunicorn import util
+from gunicorn_zmq import util
 
 PLATFORM = platform.system()
-IS_CYGWIN = PLATFORM.startswith('CYGWIN')
 
 
 class WorkerTmp(object):
@@ -28,8 +27,7 @@ class WorkerTmp(object):
 
         # unlink the file so we don't leak tempory files
         try:
-            if not IS_CYGWIN:
-                util.unlink(name)
+            util.unlink(name)
             self._tmp = os.fdopen(fd, 'w+b', 1)
         except:
             os.close(fd)
