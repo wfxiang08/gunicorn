@@ -3,7 +3,6 @@
 # This file is part of gunicorn released under the MIT license.
 # See the NOTICE for more information.
 
-import errno
 import os
 import sys
 from datetime import datetime
@@ -16,6 +15,12 @@ _socket = __import__("socket")
 if sys.platform == "darwin":
     os.environ['EVENT_NOKQUEUE'] = "1"
 
+"""
+    gevent和zeromq的结合
+
+    专注于处理后台基于zeromq的RPC, 不负责处理http请求
+"""
+
 try:
     import gevent
 except ImportError:
@@ -23,31 +28,16 @@ except ImportError:
 
 from gevent.pool import Pool
 from gevent.server import StreamServer
-from gevent.socket import wait_write, socket
+from gevent.socket import socket
 from gevent import pywsgi
 
 import gunicorn
 from gunicorn.http.wsgi import base_environ
 from gunicorn.workers.async import AsyncWorker
-from gunicorn.http.wsgi import sendfile as o_sendfile
 
 VERSION = "gevent/%s gunicorn/%s" % (gevent.__version__, gunicorn.__version__)
 
-def _gevent_sendfile(fdout, fdin, offset, nbytes):
-    while True:
-        try:
-            return o_sendfile(fdout, fdin, offset, nbytes)
-        except OSError as e:
-            if e.args[0] == errno.EAGAIN:
-                wait_write(fdout)
-            else:
-                raise
 
-def patch_sendfile():
-    from gunicorn.http import wsgi
-
-    if o_sendfile is not None:
-        setattr(wsgi, "sendfile", _gevent_sendfile)
 
 
 class GeventWorker(AsyncWorker):
@@ -64,9 +54,6 @@ class GeventWorker(AsyncWorker):
             monkey.patch_all()
         else:
             monkey.patch_all(subprocess=True)
-
-        # monkey patch sendfile to make it none blocking
-        patch_sendfile()
 
         # patch sockets
         sockets = []
@@ -93,6 +80,8 @@ class GeventWorker(AsyncWorker):
         # 假定只有一个 sockets
         for s in self.sockets:
             s.setblocking(1)
+
+            # 控制同一个进程内部的并发度
             pool = Pool(self.worker_connections)
             if self.server_class is not None:
                 environ = base_environ(self.cfg)

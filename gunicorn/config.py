@@ -90,26 +90,11 @@ class Config(object):
 
     @property
     def worker_class_str(self):
-        uri = self.settings['worker_class'].get()
-
-        ## are we using a threaded worker?
-        is_sync = uri.endswith('SyncWorker') or uri == 'sync'
-        if is_sync and self.threads > 1:
-            return "threads"
-        return uri
+        return "ggevent"
 
     @property
     def worker_class(self):
         uri = self.settings['worker_class'].get()
-
-        ## are we using a threaded worker?
-        # 默认为: sync ? 在什么地方配置呢?
-        is_sync = uri.endswith('SyncWorker') or uri == 'sync'
-
-        # sync
-        # gthread 两种模式
-        if is_sync and self.threads > 1:
-            uri = "gunicorn.workers.gthread.ThreadWorker"
 
         # 加载worker_class
         worker_class = util.load_class(uri)
