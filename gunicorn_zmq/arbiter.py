@@ -629,7 +629,8 @@ class Arbiter(object):
         # worker_class
         # 参考: gunicorn.workers.xxxx
         #
-        worker = GeventWorker(self.worker_age, self.pid, self.LISTENERS, self.app, self.timeout / 2.0, self.cfg, self.log)
+        # 只支持绑定到一个ip/port
+        worker = GeventWorker(self.worker_age, self.pid, self.LISTENERS[0], self.app, self.timeout / 2.0, self.cfg, self.log)
         self.cfg.pre_fork(self, worker)
 
         pid = os.fork()
