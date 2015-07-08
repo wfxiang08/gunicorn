@@ -20,6 +20,7 @@ try:
     import gevent
 except ImportError:
     raise RuntimeError("You need gevent installed to use this worker.")
+
 from gevent.pool import Pool
 from gevent.server import StreamServer
 from gevent.socket import wait_write, socket
@@ -70,8 +71,7 @@ class GeventWorker(AsyncWorker):
         # patch sockets
         sockets = []
         for s in self.sockets:
-            sockets.append(socket(s.FAMILY, _socket.SOCK_STREAM,
-                _sock=s))
+            sockets.append(socket(s.FAMILY, _socket.SOCK_STREAM, _sock=s))
         self.sockets = sockets
 
     def notify(self):
@@ -90,6 +90,7 @@ class GeventWorker(AsyncWorker):
         if self.cfg.is_ssl:
             ssl_args = dict(server_side=True, **self.cfg.ssl_options)
 
+        # 假定只有一个 sockets
         for s in self.sockets:
             s.setblocking(1)
             pool = Pool(self.worker_connections)

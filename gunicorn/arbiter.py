@@ -513,8 +513,8 @@ class Arbiter(object):
         # 如果有 timeout控制, 则检查时间timeout
         workers = list(self.WORKERS.items())
         for (pid, worker) in workers:
-            diff = time.time() - worker.tmp.last_update()
             try:
+                diff = time.time() - worker.tmp.last_update()
                 # 如果没有超时
                 if diff < self.timeout_warning:
                     continue
@@ -527,8 +527,9 @@ class Arbiter(object):
                             self.pid_2_lasturl[pid] = url
                             self.sentry_client.captureMessage('Gunicorn Worker WARNING timediff: %.3f, WARNGING THRESHOLD: %.3f, Processing URL: %s' % (diff, self.timeout_warning, worker.current_url.value))
                     continue
-            except ValueError:
+            except ValueError: # 说明Worker已经挂了或者还没有初始化?
                 continue
+
             if self.sentry_client:
                 # 如何获取worker的信息呢?
                 # 相同的URL只处理一次
@@ -600,7 +601,7 @@ class Arbiter(object):
         #     self.sentry_client.captureMessage('Gunicorn Kill Extra Workers IN manage_workers')
 
         # 在 self.NEW_WORKERS 没有起来时，不要轻易地杀掉旧的进程
-        for pid, worker in self.NEW_WORKERS:
+        for pid, worker in list(self.NEW_WORKERS.items()):
             if worker.booted.value:
                 self.NEW_WORKERS.pop(pid)
 
